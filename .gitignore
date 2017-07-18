@@ -1,3 +1,11 @@
+#Mac 
+._* 
+.DS_Store
+#git
+.gitignore
+.git/*
+.git
+
 #rshiny files 
 *.cdf
 *.html
