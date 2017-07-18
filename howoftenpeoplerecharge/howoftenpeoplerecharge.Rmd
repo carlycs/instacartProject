@@ -1,0 +1,77 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+How often people rebuy ?
+My goal is to take a look on the customer behavior and find if we can cluster them by how often they buy.
+The steps that I'll take:
+Group the data by users
+How many users haven't bought again ?
+Histogram
+Cluster
+
+Group the data by Users
+
+```{r}
+options(warn=-1)
+library(ggplot2) 
+library(readr) 
+library(dplyr)
+library(ggplot2)
+
+orders <- read_csv("../input/orders.csv")
+
+user_freq <- orders %>%
+    select(user_id, order_number, days_since_prior_order) %>%
+    group_by(user_id) %>%
+    summarise(total = max(order_number), 
+              frequency = mean(days_since_prior_order, na.rm = TRUE))
+
+
+glimpse(user_freq)
+```
+How many users haven't bought again ?
+I didn't know this, but looks like we just have users that have bought more than once.
+This means that we don't have to clean it.
+Take a look :
+```{r}
+user_freq %>%
+    filter(total == 1) %>%
+    glimpse
+```
+
+Histogram
+1 - How many days there are between orders :
+
+```{r}
+ggplot(user_freq, aes(frequency)) +
+    geom_histogram()
+```
+
+2 - Number of orders :
+In [4]:
+```{r}
+ggplot(user_freq, aes(total)) +
+    geom_histogram()
+```
+
+Cluster
+```{r}
+set.seed(42)
+clus <- kmeans(user_freq[,2:3], 4)
+clus$cluster <- as.factor(clus$cluster)
+(clus$centers)
+```
+Cluster results looks very good
+We can see that there are some type of users, and the types are:
+Buy twice a week
+Buy almost monthly
+Buy almost weekly
+Buy almost every two weeks
+```{r}
+ggplot(user_freq,
+       aes(total, frequency, color = clus$cluster)) +
+    geom_point()
+```
+

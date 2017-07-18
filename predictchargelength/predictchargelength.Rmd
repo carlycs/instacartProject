@@ -1,0 +1,85 @@
+---
+title: "Predict the Basketsize"
+author: ""
+output: html_document
+---
+
+Hi All, 
+
+one question when predicting the baskets is how much products to put into. I would like to share with you a simple approach to get an estimate of the number of products a user is likely to put into the basket.
+
+```{r echo=FALSE, message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+
+prior <- read_csv("../input/order_products__prior.csv")
+train <- read_csv("../input/order_products__train.csv")
+orders <- read_csv("../input/orders.csv")
+submissions <- read_csv("../input/sample_submission.csv")
+```
+
+### Average basketsize per user 
+
+The idea is to look at the purchase history of each user, get the average number of items in the baskets and use this number for predicting the number of items in future baskets. 
+
+To achieve this, we first accumulate all the products each user bought and the total number of purchases per user:
+
+```{r}
+ordered_items_per_user <- rbind(prior, train) %>% 
+  inner_join(orders, by="order_id") %>% 
+  group_by(user_id) %>%
+  summarise(ordered_items = as.vector(list(product_id)), 
+            n_orders = length(unique(order_id))) 
+```
+
+Let's take a look at the distribution of the number of orders per user: 
+
+```{r}
+hist(ordered_items_per_user$n_orders, breaks = 0:105, ylim = c(0, 25000), ylab="Number of users", xlab="Number of orders", main="Orders per user")
+mtext(paste("Total:", sum(ordered_items_per_user$n_orders), "orders,",  nrow(ordered_items_per_user), "users"), padj = 0.6)
+```
+
+In the second step, we divide the number of ordered products by the number of orders for each user to get the average basket size per user:  
+
+```{r}
+ordered_items_per_user$avg_items_per_basket <- 
+  unlist(Map(function(v,n) { length(v)/n }, 
+             ordered_items_per_user$ordered_items, 
+             ordered_items_per_user$n_orders))
+```
+
+Let's see how the average basketsizes are distributed:
+
+```{r}
+mean_avg_basketsize <- round(mean(ordered_items_per_user$avg_items_per_basket), digits=2)
+mode_avg_basketsize <- which.max(table(round(ordered_items_per_user$avg_items_per_basket)))
+hist(ordered_items_per_user$avg_items_per_basket, breaks = 0:70, ylim = c(0, 20000), ylab="Number of users", xlab="Average basketsize", main="Average basketsize per user")
+mtext(paste("Mean:", mean_avg_basketsize, "Mode:", mode_avg_basketsize), padj = 0.6)
+```
+
+While most of the users have 8 products in their baskets, the average basket contains 10 products. 
+For determining the number of products in the future baskets, we could either choose one of those measures for every user or we could choose the average number of items per basket for each user individually. 
+Finally, if you would like to try the second option, here is how to get that data:
+
+```{r}
+(predicted_basketsizes <- ordered_items_per_user %>%
+  inner_join(orders, by = "user_id") %>% 
+  inner_join(submissions, by = "order_id") %>%
+  select(order_id, n_items = avg_items_per_basket))
+```
+
+
+
+**Stay tuned for further improvements!**
+
+
+
+```{r, echo=FALSE}
+write_csv(predicted_basketsizes, "predicted_basketsizes.csv")
+```
+
+Is there any relationship of basket size with the days_since_previous_order?
+
+But what about the exact products that the user will buy in the future?
+

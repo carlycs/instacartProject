@@ -1,3 +1,15 @@
+#rshiny files 
+*.cdf
+*.html
+/exploratoryanalysis/rsconnect/*
+
+#data files both input and output
+/input/*
+*.csv
+
+#Mac file
+.DS_Store
+
 # History files
 .Rhistory
 .Rapp.history

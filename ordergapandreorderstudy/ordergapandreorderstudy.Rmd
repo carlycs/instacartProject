@@ -1,0 +1,93 @@
+---
+title: "R Notebook for order gap and re-order study"
+output: html_notebook
+---
+
+
+
+```{r}
+library(dplyr)
+library(data.table)
+library(ggplot2)
+
+# Products Data
+product <- fread('input/products.csv')
+#head(product)
+
+# Order Data
+orders2 <- fread('input/orders.csv')
+users <- unique(orders2$user_id)
+set.seed(101)
+keep <- sample(users,50000,replace=F)
+
+orders2$days_since_order <- ifelse( is.na(orders2$days_since_prior_order),0,orders2$days_since_prior_order)
+orders <- orders2 %>% filter(user_id %in% keep) %>% arrange(user_id,order_number) %>% 
+            group_by(user_id) %>% mutate(days_since_first_order = cumsum(days_since_order))
+orders$days_since_order <- NULL
+orders <- data.table(orders)
+rm(orders2)
+
+# Order_Product Prior Data
+order_product_prior <- fread('input/order_products__prior.csv')
+
+# Order_Product Train Data
+order_product_train <- fread('input/order_products__train.csv')
+
+## Merging
+# Rbind Order_Product Train/Prior
+order_product_all <- rbind(order_product_prior,order_product_train)
+
+# Merge with orders data
+setkey(orders,order_id)
+setkey(order_product_all,order_id)
+order_product_all_2 <- orders[order_product_all,nomatch=0]
+
+# Final Data
+fdat <- order_product_all_2
+fdat <- fdat %>% group_by(user_id,product_id) %>% 
+      mutate(days_since_prior_product_order = (days_since_first_order - lag(days_since_first_order))) 
+
+# removing redundant datasets
+rm(order_product_all_2,order_product_all,order_product_prior,order_product_train)
+
+head(fdat)
+```
+
+```{r}
+print("section two of the study")
+dim(fdat)
+tmp <- table(orders$days_since_prior_order)
+p <- ggplot(data.frame(tmp), aes(Var1, Freq)) + geom_bar(stat = "identity",fill="darkgreen") + xlab("Days since prior order") + theme_bw()
+p
+```
+
+```{r}
+print("section three of the study")
+tmp <- fdat %>% group_by(user_id) %>% summarise(max(days_since_first_order))
+tmp <- table(tmp$`max(days_since_first_order)`)
+p <- ggplot(data.frame(tmp), aes(Var1, Freq)) + geom_bar(stat = "identity",fill="dimgrey") + 
+  xlab("Days since first order") + theme_bw() + scale_x_discrete(breaks=c(seq(0,330,30),365))
+p
+
+```
+
+```{r}
+print("section three of the study")
+tmp <- fdat %>% group_by(user_id) %>% summarise(max(days_since_first_order))
+tmp <- table(tmp$`max(days_since_first_order)`)
+p <- ggplot(data.frame(tmp), aes(Var1, Freq)) + geom_bar(stat = "identity",fill="dimgrey") + 
+  xlab("Days since first order") + theme_bw() + scale_x_discrete(breaks=c(seq(0,330,30),365))
+p
+
+```
+
+```{r}
+print("part four of the study")
+tmp <- table(fdat$days_since_prior_product_order)
+p <- ggplot(data.frame(tmp), aes(x=Var1, y=Freq,group=1)) + geom_line(color="darkmagenta",lwd=1) +
+                    xlab("Distribution of reorder gGap") + theme_bw() + 
+                        scale_x_discrete(breaks=c(seq(0,330,30),7,14,21,365),limits = seq(0,365)) 
+p
+
+```
+
